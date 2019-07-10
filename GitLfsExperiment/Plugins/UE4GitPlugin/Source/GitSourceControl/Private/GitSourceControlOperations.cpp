@@ -3,8 +3,8 @@
 // Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
 // or copy at http://opensource.org/licenses/MIT)
 
+#include "GitSourceControlPrivatePCH.h"
 #include "GitSourceControlOperations.h"
-
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
 #include "SourceControlOperations.h"
@@ -181,8 +181,7 @@ bool FGitCheckInWorker::Execute(FGitSourceControlCommand& InCommand)
 			}
 
 			Operation->SetSuccessMessage(ParseCommitResults(InCommand.InfoMessages));
-			const FString Message = (InCommand.InfoMessages.Num() > 0) ? InCommand.InfoMessages[0] : TEXT("");
-			UE_LOG(LogSourceControl, Log, TEXT("commit successful: %s"), *Message);
+			UE_LOG(LogSourceControl, Log, TEXT("commit successful: %s"), *InCommand.InfoMessages[0]);
 
 			// git-lfs: push and unlock files
 			if(InCommand.bUsingGitLfsLocking && InCommand.bCommandSuccessful)
@@ -265,7 +264,7 @@ bool FGitDeleteWorker::UpdateStates() const
 }
 
 
-// Get lists of Missing files (ie "deleted"), Modified files, and "other than Added" Existing files
+// Get lists of Missing files (ie "deleted"), Existing files, and "other than Added" Existing files
 void GetMissingVsExistingFiles(const TArray<FString>& InFiles, TArray<FString>& OutMissingFiles, TArray<FString>& OutAllExistingFiles, TArray<FString>& OutOtherThanAddedExistingFiles)
 {
 	FGitSourceControlModule& GitSourceControl = FModuleManager::GetModuleChecked<FGitSourceControlModule>("GitSourceControl");
@@ -288,17 +287,10 @@ void GetMissingVsExistingFiles(const TArray<FString>& InFiles, TArray<FString>& 
 				OutOtherThanAddedExistingFiles.Add(State->GetFilename());
 				OutAllExistingFiles.Add(State->GetFilename());
 			}
-			else if(State->CanRevert()) // for locked but unmodified files
-			{
-				OutOtherThanAddedExistingFiles.Add(State->GetFilename());
-			}
 		}
 		else
 		{
-			if (State->IsSourceControlled())
-			{
-				OutMissingFiles.Add(State->GetFilename());
-			}
+			OutMissingFiles.Add(State->GetFilename());
 		}
 	}
 }
@@ -350,18 +342,8 @@ bool FGitRevertWorker::Execute(FGitSourceControlCommand& InCommand)
 		}
 	}
 
-	// If no files were specified (full revert), refresh all relevant files instead of the specified files (which is an empty list in full revert)
-	// This is required so that files that were "Marked for add" have their status updated after a full revert.
-	TArray<FString> FilesToUpdate = InCommand.Files;
-	if (InCommand.Files.Num() <= 0)
-	{
-		for (const auto& File : MissingFiles) FilesToUpdate.Add(File);
-		for (const auto& File : AllExistingFiles) FilesToUpdate.Add(File);
-		for (const auto& File : OtherThanAddedExistingFiles) FilesToUpdate.Add(File);
-	}
-
 	// now update the status of our files
-	GitSourceControlUtils::RunUpdateStatus(InCommand.PathToGitBinary, InCommand.PathToRepositoryRoot, InCommand.bUsingGitLfsLocking, FilesToUpdate, InCommand.ErrorMessages, States);
+	GitSourceControlUtils::RunUpdateStatus(InCommand.PathToGitBinary, InCommand.PathToRepositoryRoot, InCommand.bUsingGitLfsLocking, AllExistingFiles, InCommand.ErrorMessages, States);
 
 	return InCommand.bCommandSuccessful;
 }

@@ -4,9 +4,9 @@ Unreal Engine 4 Git Source Control Plugin
 [![release](https://img.shields.io/github/release/SRombauts/UE4GitPlugin.svg)](https://github.com/SRombauts/UE4GitPlugin/releases)
 [![Git Plugin issues](https://img.shields.io/github/issues/SRombauts/UE4GitPlugin.svg)](https://github.com/SRombauts/UE4GitPlugin/issues)
 [![Join the chat at https://gitter.im/SRombauts/UE4GitPlugin](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/SRombauts/UE4GitPlugin)
-UE4GitPlugin is a simple Git Source Control Plugin for **Unreal Engine 4.22**.
+UE4GitPlugin is a simple Git Source Control Plugin for **Unreal Engine 4.19**.
 
-Developed and contributed by Sébastien Rombauts 2014-2019 (sebastien.rombauts@gmail.com)
+Developed and contributed by Sébastien Rombauts 2014-2018 (sebastien.rombauts@gmail.com)
 <a href="https://www.paypal.me/SRombauts" title="Pay Me a Beer! Donate with PayPal :)"><img src="https://www.paypalobjects.com/webstatic/paypalme/images/pp_logo_small.png" width="118"></a>
 
 - First version of the plugin has been **integrated by default in UE4.7 in "beta version"**.
@@ -53,7 +53,7 @@ Status Icons:
   - can also create a .gitattributes file to enable Git LFS (Large File System) as part of initialization
   - can also enable Git LFS 2.x File Locks as part of initialization
   - can also make the initial commit, with custom multi-line message
-- display status icons to show modified/added/deleted/untracked files, not at head and conflicted
+- display status icons to show modified/added/deleted/untracked files
 - show history of a file
 - visual diff of a blueprint against depot or between previous versions of a file
 - revert modifications of a file (works best with "Content Hot-Reload" experimental option of UE4.15, by default since 4.16)
@@ -152,11 +152,11 @@ When everything is done, click on "Accept Settings".
 The plugin mostly interacts with you local Git repository ("Depot"), not much with the remote server (usually "origin").
 
 It displays Git status icons on top of assets in the Asset Browser:
-- No icon means that the file is under source control and unchanged since last commit, or ignored.
+- No icon means that the file is under source control and unchanged since last commit.
 - A red mark is for "modified" assets, that is the one that needs to be committed (so not the same as "Check-out" in Perforce/SVN/Plastic SCM).
 - A red cross is for "added" assets, that also needs to be committed
 - A blue lightning means "renamed".
-- A yellow exclamation point is for files in conflict after a merge, or is not at head (latest revision on the current remote branch).
+- A yellow exclamation point is for files in conflict after a merge.
 - A yellow question mark is for files not in source control.
 
 TODO:

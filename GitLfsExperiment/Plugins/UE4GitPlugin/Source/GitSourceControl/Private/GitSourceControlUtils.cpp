@@ -3,8 +3,8 @@
 // Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
 // or copy at http://opensource.org/licenses/MIT)
 
+#include "GitSourceControlPrivatePCH.h"
 #include "GitSourceControlUtils.h"
-
 #include "GitSourceControlCommand.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformFilemanager.h"
@@ -106,31 +106,7 @@ static bool RunCommandInternalRaw(const FString& InCommand, const FString& InPat
 	UE_LOG(LogSourceControl, Log, TEXT("RunCommand: 'git %s'"), *LogableCommand);
 //#endif
 
-	FString PathToGitOrEnvBinary = InPathToGitBinary;
-#if PLATFORM_MAC
-	// The Cocoa application does not inherit shell environment variables, so add the path expected to have git-lfs to PATH
-	FString PathEnv = FPlatformMisc::GetEnvironmentVariable(TEXT("PATH"));
-	FString GitInstallPath = FPaths::GetPath(InPathToGitBinary);
-
-	TArray<FString> PathArray;
-	PathEnv.ParseIntoArray(PathArray, FPlatformMisc::GetPathVarDelimiter());
-	bool bHasGitInstallPath = false;
-	for (auto Path : PathArray)
-	{
-		if (GitInstallPath.Equals(Path, ESearchCase::CaseSensitive))
-		{
-			bHasGitInstallPath = true;
-			break;
-		}
-	}
-
-	if (!bHasGitInstallPath)
-	{
-		PathToGitOrEnvBinary = FString("/usr/bin/env");
-		FullCommand = FString::Printf(TEXT("PATH=\"%s%s%s\" \"%s\" %s"), *GitInstallPath, FPlatformMisc::GetPathVarDelimiter(), *PathEnv, *InPathToGitBinary, *FullCommand);
-	}
-#endif
-	FPlatformProcess::ExecProcess(*PathToGitOrEnvBinary, *FullCommand, &ReturnCode, &OutResults, &OutErrors);
+	FPlatformProcess::ExecProcess(*InPathToGitBinary, *FullCommand, &ReturnCode, &OutResults, &OutErrors);
 
 //#if UE_BUILD_DEBUG
 	UE_LOG(LogSourceControl, Log, TEXT("RunCommand(%s):\n%s"), *InCommand, *OutResults);
@@ -183,10 +159,9 @@ FString FindGitBinaryPath()
 	if(!bFound)
 	{
 		// else the install dir for the current user: C:\Users\UserName\AppData\Local\Programs\Git\cmd
-		//const FString AppDataLocalPath = FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"));
 		TCHAR AppDataLocalPath[4096];
 		FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"), AppDataLocalPath, ARRAY_COUNT(AppDataLocalPath));
-		GitBinaryPath = FString::Printf(TEXT("%s/Programs/Git/cmd/git.exe"), *AppDataLocalPath);
+		GitBinaryPath = FString::Printf(TEXT("%s/Programs/Git/cmd/git.exe"), AppDataLocalPath);
 		bFound = CheckGitAvailability(GitBinaryPath);
 	}
 
@@ -207,10 +182,9 @@ FString FindGitBinaryPath()
 	if(!bFound)
 	{
 		// C:\Users\UserName\AppData\Local\Atlassian\SourceTree\git_local\bin
-		//const FString AppDataLocalPath = FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"));
 		TCHAR AppDataLocalPath[4096];
 		FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"), AppDataLocalPath, ARRAY_COUNT(AppDataLocalPath));
-		GitBinaryPath = FString::Printf(TEXT("%s/Atlassian/SourceTree/git_local/bin/git.exe"), *AppDataLocalPath);
+		GitBinaryPath = FString::Printf(TEXT("%s/Atlassian/SourceTree/git_local/bin/git.exe"), AppDataLocalPath);
 		bFound = CheckGitAvailability(GitBinaryPath);
 	}
 
@@ -219,21 +193,20 @@ FString FindGitBinaryPath()
 	{
 		// The latest GitHub Desktop adds its binaries into the local appdata directory:
 		// C:\Users\UserName\AppData\Local\GitHub\PortableGit_c2ba306e536fdf878271f7fe636a147ff37326ad\cmd
-		//const FString AppDataLocalPath = FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"));
 		TCHAR AppDataLocalPath[4096];
 		FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"), AppDataLocalPath, ARRAY_COUNT(AppDataLocalPath));
-		const FString SearchPath = FString::Printf(TEXT("%s/GitHub/PortableGit_*"), *AppDataLocalPath);
+		FString SearchPath = FString::Printf(TEXT("%s/GitHub/PortableGit_*"), AppDataLocalPath);
 		TArray<FString> PortableGitFolders;
 		IFileManager::Get().FindFiles(PortableGitFolders, *SearchPath, false, true);
 		if(PortableGitFolders.Num() > 0)
 		{
 			// FindFiles just returns directory names, so we need to prepend the root path to get the full path.
-			GitBinaryPath = FString::Printf(TEXT("%s/GitHub/%s/cmd/git.exe"), *AppDataLocalPath, *(PortableGitFolders.Last())); // keep only the last PortableGit found
+			GitBinaryPath = FString::Printf(TEXT("%s/GitHub/%s/cmd/git.exe"), AppDataLocalPath, *(PortableGitFolders.Last())); // keep only the last PortableGit found
 			bFound = CheckGitAvailability(GitBinaryPath);
 			if (!bFound)
 			{
 				// If Portable git is not found in "cmd/" subdirectory, try the "bin/" path that was in use before
-				GitBinaryPath = FString::Printf(TEXT("%s/GitHub/%s/bin/git.exe"), *AppDataLocalPath, *(PortableGitFolders.Last())); // keep only the last PortableGit found
+				GitBinaryPath = FString::Printf(TEXT("%s/GitHub/%s/bin/git.exe"), AppDataLocalPath, *(PortableGitFolders.Last())); // keep only the last PortableGit found
 				bFound = CheckGitAvailability(GitBinaryPath);
 			}
 		}
@@ -244,85 +217,6 @@ FString FindGitBinaryPath()
 	{
 		GitBinaryPath = TEXT("C:/Program Files (x86)/fournova/Tower/vendor/Git/bin/git.exe");
 		bFound = CheckGitAvailability(GitBinaryPath);
-	}
-
-#elif PLATFORM_MAC
-	// 1) First of all, look for the version of git provided by official git
-	FString GitBinaryPath = TEXT("/usr/local/git/bin/git");
-	bool bFound = CheckGitAvailability(GitBinaryPath);
-
-	// 2) Else, look for the version of git provided by Homebrew
-	if (!bFound)
-	{
-		GitBinaryPath = TEXT("/usr/local/bin/git");
-		bFound = CheckGitAvailability(GitBinaryPath);
-	}
-
-	// 3) Else, look for the version of git provided by MacPorts
-	if (!bFound)
-	{
-		GitBinaryPath = TEXT("/opt/local/bin/git");
-		bFound = CheckGitAvailability(GitBinaryPath);
-	}
-
-	// 4) Else, look for the version of git provided by Command Line Tools
-	if (!bFound)
-	{
-		GitBinaryPath = TEXT("/usr/bin/git");
-		bFound = CheckGitAvailability(GitBinaryPath);
-	}
-
-	{
-		SCOPED_AUTORELEASE_POOL;
-		NSWorkspace* SharedWorkspace = [NSWorkspace sharedWorkspace];
-
-		// 5) Else, look for the version of local_git provided by SmartGit
-		if (!bFound)
-		{
-			NSURL* AppURL = [SharedWorkspace URLForApplicationWithBundleIdentifier:@"com.syntevo.smartgit"];
-			if (AppURL != nullptr)
-			{
-				NSBundle* Bundle = [NSBundle bundleWithURL:AppURL];
-				GitBinaryPath = FString::Printf(TEXT("%s/git/bin/git"), *FString([Bundle resourcePath]));
-				bFound = CheckGitAvailability(GitBinaryPath);
-			}
-		}
-
-		// 6) Else, look for the version of local_git provided by SourceTree
-		if (!bFound)
-		{
-			NSURL* AppURL = [SharedWorkspace URLForApplicationWithBundleIdentifier:@"com.torusknot.SourceTreeNotMAS"];
-			if (AppURL != nullptr)
-			{
-				NSBundle* Bundle = [NSBundle bundleWithURL:AppURL];
-				GitBinaryPath = FString::Printf(TEXT("%s/git_local/bin/git"), *FString([Bundle resourcePath]));
-				bFound = CheckGitAvailability(GitBinaryPath);
-			}
-		}
-
-		// 7) Else, look for the version of local_git provided by GitHub Desktop
-		if (!bFound)
-		{
-			NSURL* AppURL = [SharedWorkspace URLForApplicationWithBundleIdentifier:@"com.github.GitHubClient"];
-			if (AppURL != nullptr)
-			{
-				NSBundle* Bundle = [NSBundle bundleWithURL:AppURL];
-				GitBinaryPath = FString::Printf(TEXT("%s/app/git/bin/git"), *FString([Bundle resourcePath]));
-				bFound = CheckGitAvailability(GitBinaryPath);
-			}
-		}
-
-		// 8) Else, look for the version of local_git provided by Tower2
-		if (!bFound)
-		{
-			NSURL* AppURL = [SharedWorkspace URLForApplicationWithBundleIdentifier:@"com.fournova.Tower2"];
-			if (AppURL != nullptr)
-			{
-				NSBundle* Bundle = [NSBundle bundleWithURL:AppURL];
-				GitBinaryPath = FString::Printf(TEXT("%s/git/bin/git"), *FString([Bundle resourcePath]));
-				bFound = CheckGitAvailability(GitBinaryPath);
-			}
-		}
 	}
 
 #else
@@ -448,9 +342,9 @@ bool FindRootDirectory(const FString& InPath, FString& OutRepositoryRoot)
 
 	while(!bFound && !OutRepositoryRoot.IsEmpty())
 	{
-		// Look for the ".git" subdirectory (or file) present at the root of every Git repository
+		// Look for the ".git" subdirectory present at the root of every Git repository
 		PathToGitSubdirectory = OutRepositoryRoot / TEXT(".git");
-		bFound = IFileManager::Get().DirectoryExists(*PathToGitSubdirectory) || IFileManager::Get().FileExists(*PathToGitSubdirectory);
+		bFound = IFileManager::Get().DirectoryExists(*PathToGitSubdirectory);
 		if(!bFound)
 		{
 			int32 LastSlashIndex;
@@ -636,7 +530,7 @@ bool RunCommit(const FString& InPathToGitBinary, const FString& InRepositoryRoot
 	}
 	else
 	{
-		bResult = RunCommandInternal(TEXT("commit"), InPathToGitBinary, InRepositoryRoot, InParameters, InFiles, OutResults, OutErrorMessages);
+		RunCommandInternal(TEXT("commit"), InPathToGitBinary, InRepositoryRoot, InParameters, InFiles, OutResults, OutErrorMessages);
 	}
 
 	return bResult;
@@ -1022,6 +916,11 @@ bool RunUpdateStatus(const FString& InPathToGitBinary, const FString& InReposito
 		}
 	}
 
+	TArray<FString> Results;
+	TArray<FString> Parameters;
+	Parameters.Add(TEXT("--porcelain"));
+	Parameters.Add(TEXT("--ignored"));
+
 	// Git status does not show any "untracked files" when called with files from different subdirectories! (issue #3)
 	// 1) So here we group files by path (ie. by subdirectory)
 	TMap<FString, TArray<FString>> GroupOfFiles;
@@ -1041,14 +940,6 @@ bool RunUpdateStatus(const FString& InPathToGitBinary, const FString& InReposito
 		}
 	}
 
-	// Get the current branch name, since we need origin of current branch
-	FString BranchName;
-	GitSourceControlUtils::GetBranchName(InPathToGitBinary, InRepositoryRoot, BranchName);
-
-	TArray<FString> Parameters;
-	Parameters.Add(TEXT("--porcelain"));
-	Parameters.Add(TEXT("--ignored"));
-
 	// 2) then we can batch git status operation by subdirectory
 	for(const auto& Files : GroupOfFiles)
 	{
@@ -1065,42 +956,12 @@ bool RunUpdateStatus(const FString& InPathToGitBinary, const FString& InReposito
 		{
 			OnePath.Add(Path);
 		}
+		TArray<FString> ErrorMessages;
+		const bool bResult = RunCommand(TEXT("status"), InPathToGitBinary, InRepositoryRoot, Parameters, OnePath, Results, ErrorMessages);
+		OutErrorMessages.Append(ErrorMessages);
+		if(bResult)
 		{
-			TArray<FString> Results;
-			TArray<FString> ErrorMessages;
-			const bool bResult = RunCommand(TEXT("status"), InPathToGitBinary, InRepositoryRoot, Parameters, OnePath, Results, ErrorMessages);
-			OutErrorMessages.Append(ErrorMessages);
-			if(bResult)
-			{
-				ParseStatusResults(InPathToGitBinary, InRepositoryRoot, InUsingLfsLocking, Files.Value, LockedFiles, Results, OutStates);
-			}
-		}
-
-		if (!BranchName.IsEmpty())
-		{
-			// Using git diff, we can obtain a list of files that were modified between our current origin and HEAD. Assumes that fetch has been run to get accurate info.
-			// TODO: should do a fetch (at least periodically).
-			TArray<FString> Results;
-			TArray<FString> ErrorMessages;
-			TArray<FString> ParametersDiff;
-			ParametersDiff.Add(TEXT("--name-only"));
-			ParametersDiff.Add(FString::Printf(TEXT("origin/%s "), *BranchName));
-			ParametersDiff.Add(TEXT("HEAD"));
-			const bool bResultDiff = RunCommand(TEXT("diff"), InPathToGitBinary, InRepositoryRoot, ParametersDiff, OnePath, Results, ErrorMessages);
-			OutErrorMessages.Append(ErrorMessages);
-			if (bResultDiff)
-			{
-				for (const FString& NewerFileName : Results)
-				{
-					const FString NewerFilePath = FPaths::ConvertRelativePathToFull(InRepositoryRoot, NewerFileName);
-
-					// Find existing corresponding file state to update it (not found would mean new file or not in the current path)
-					if (FGitSourceControlState* FileStatePtr = OutStates.FindByPredicate([NewerFilePath](FGitSourceControlState& FileState) { return FileState.LocalFilename == NewerFilePath; }))
-					{
-						FileStatePtr->bNewerVersionOnServer = true;
-					}
-				}
-			}
+			ParseStatusResults(InPathToGitBinary, InRepositoryRoot, InUsingLfsLocking, Files.Value, LockedFiles, Results, OutStates);
 		}
 	}
 

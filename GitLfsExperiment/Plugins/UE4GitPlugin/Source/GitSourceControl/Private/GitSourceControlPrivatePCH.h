@@ -5,11 +5,7 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
+#include "Core.h"
+#include "SlateBasics.h"
+#include "EditorStyle.h"
 #include "ISourceControlModule.h"
-#include "ISourceControlOperation.h"
-#include "ISourceControlProvider.h"
-#include "ISourceControlRevision.h"
-#include "ISourceControlState.h"
-#include "Misc/Paths.h"
-#include "Modules/ModuleManager.h"

@@ -47,7 +47,6 @@ public:
 		, WorkingCopyState(EWorkingCopyState::Unknown)
 		, LockState(ELockState::Unknown)
 		, bUsingGitLfsLocking(InUsingLfsLocking)
-		, bNewerVersionOnServer(false)
 		, TimeStamp(0)
 	{
 	}
@@ -68,12 +67,6 @@ public:
 	virtual bool CanCheckout() const override;
 	virtual bool IsCheckedOut() const override;
 	virtual bool IsCheckedOutOther(FString* Who = nullptr) const override;
-	virtual bool IsCheckedOutInOtherBranch(const FString& CurrentBranch = FString()) const /* UE4.20 override */ { return false;  }
-	virtual bool IsModifiedInOtherBranch(const FString& CurrentBranch = FString()) const /* UE4.20 override */ { return false; }
-	virtual bool IsCheckedOutOrModifiedInOtherBranch(const FString& CurrentBranch = FString()) const /* UE4.20 override */ { return IsCheckedOutInOtherBranch(CurrentBranch) || IsModifiedInOtherBranch(CurrentBranch); }
-	virtual TArray<FString> GetCheckedOutBranches() const /* UE4.20 override */ { return TArray<FString>(); }
-	virtual FString GetOtherUserBranchCheckedOuts() const /* UE4.20 override */ { return FString(); }
-	virtual bool GetOtherBranchHeadModification(FString& HeadBranchOut, FString& ActionOut, int32& HeadChangeListOut) const /* UE4.20 override */ { return false; }
 	virtual bool IsCurrent() const override;
 	virtual bool IsSourceControlled() const override;
 	virtual bool IsAdded() const override;
@@ -108,9 +101,6 @@ public:
 
 	/** Tells if using the Git LFS file Locking workflow */
 	bool bUsingGitLfsLocking;
-
-	/** Whether a newer version exists on the server */
-	bool bNewerVersionOnServer;
 
 	/** The timestamp of the last update */
 	FDateTime TimeStamp;

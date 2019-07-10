@@ -3,8 +3,8 @@
 // Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
 // or copy at http://opensource.org/licenses/MIT)
 
+#include "GitSourceControlPrivatePCH.h"
 #include "SGitSourceControlSettings.h"
-
 #include "Fonts/SlateFontInfo.h"
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
@@ -15,13 +15,11 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
-#include "Widgets/Input/SFilePathPicker.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SSeparator.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
-#include "EditorDirectories.h"
 #include "EditorStyleSet.h"
 #include "SourceControlOperations.h"
 #include "GitSourceControlModule.h"
@@ -39,14 +37,6 @@ void SGitSourceControlSettings::Construct(const FArguments& InArgs)
 	bAutoInitialCommit = true;
 
 	InitialCommitMessage = LOCTEXT("InitialCommitMessage", "Initial commit");
-
-	const FText FileFilterType = NSLOCTEXT("GitSourceControl", "Executables", "Executables");
-#if PLATFORM_WINDOWS
-	const FString FileFilterText = FString::Printf(TEXT("%s (*.exe)|*.exe"), *FileFilterType.ToString());
-#else
-	const FString FileFilterText = FString::Printf(TEXT("%s"), *FileFilterType.ToString());
-#endif
-
 	ReadmeContent = FText::FromString(FString(TEXT("# ")) + FApp::GetProjectName() + "\n\nDeveloped with Unreal Engine 4\n");
 
 	ChildSlot
@@ -74,14 +64,10 @@ void SGitSourceControlSettings::Construct(const FArguments& InArgs)
 				+SHorizontalBox::Slot()
 				.FillWidth(2.0f)
 				[
-					SNew(SFilePathPicker)
-					.BrowseButtonImage(FEditorStyle::GetBrush("PropertyWindow.Button_Ellipsis"))
-					.BrowseButtonStyle(FEditorStyle::Get(), "HoverHintOnly")
-					.BrowseDirectory(FEditorDirectories::Get().GetLastDirectory(ELastDirectory::GENERIC_OPEN))
-					.BrowseTitle(LOCTEXT("BinaryPathBrowseTitle", "File picker..."))
-					.FilePath(this, &SGitSourceControlSettings::GetBinaryPathString)
-					.FileTypeFilter(FileFilterText)
-					.OnPathPicked(this, &SGitSourceControlSettings::OnBinaryPathPicked)
+					SNew(SEditableTextBox)
+					.Text(this, &SGitSourceControlSettings::GetBinaryPathText)
+					.OnTextCommitted(this, &SGitSourceControlSettings::OnBinaryPathTextCommited)
+					.Font(Font)
 				]
 			]
 			// Root of the local repository
@@ -339,7 +325,7 @@ void SGitSourceControlSettings::Construct(const FArguments& InArgs)
 			[
 				SNew(SHorizontalBox)
 				.Visibility(this, &SGitSourceControlSettings::MustInitializeGitRepository)
-				.ToolTipText(LOCTEXT("InitialGitCommit_Tooltip", "Make the initial Git Commit"))
+				.ToolTipText(LOCTEXT("InitialGitCommit_Tooltip", "Make the initial Git commit"))
 				+SHorizontalBox::Slot()
 				.FillWidth(0.1f)
 				[
@@ -396,17 +382,16 @@ SGitSourceControlSettings::~SGitSourceControlSettings()
 	RemoveInProgressNotification();
 }
 
-FString SGitSourceControlSettings::GetBinaryPathString() const
+FText SGitSourceControlSettings::GetBinaryPathText() const
 {
 	const FGitSourceControlModule& GitSourceControl = FModuleManager::GetModuleChecked<FGitSourceControlModule>("GitSourceControl");
-	return GitSourceControl.AccessSettings().GetBinaryPath();
+	return FText::FromString(GitSourceControl.AccessSettings().GetBinaryPath());
 }
 
-void SGitSourceControlSettings::OnBinaryPathPicked( const FString& PickedPath ) const
+void SGitSourceControlSettings::OnBinaryPathTextCommited(const FText& InText, ETextCommit::Type InCommitType) const
 {
 	FGitSourceControlModule& GitSourceControl = FModuleManager::GetModuleChecked<FGitSourceControlModule>("GitSourceControl");
-	FString PickedFullPath = FPaths::ConvertRelativePathToFull(PickedPath);
-	const bool bChanged = GitSourceControl.AccessSettings().SetBinaryPath(PickedFullPath);
+	const bool bChanged = GitSourceControl.AccessSettings().SetBinaryPath(InText.ToString());
 	if(bChanged)
 	{
 		// Re-Check provided git binary path for each change
@@ -496,7 +481,7 @@ FReply SGitSourceControlSettings::OnClickedInitializeGitRepository()
 	GitSourceControl.GetProvider().CheckRepositoryStatus(PathToGitBinary);
 	if(GitSourceControl.GetProvider().IsAvailable())
 	{
-		// List of files to add to Source Control (.uproject, Config/, Content/, Source/ files and .gitignore/.gitattributes if any)
+		// List of files to add to Source Control (.uproject, Config/, Content/, Source/ files and .gitignore if any)
 		TArray<FString> ProjectFiles;
 		ProjectFiles.Add(FPaths::GetProjectFilePath());
 		ProjectFiles.Add(FPaths::ProjectConfigDir());
@@ -509,7 +494,7 @@ FReply SGitSourceControlSettings::OnClickedInitializeGitRepository()
 		{
 			// 2.a. Create a standard ".gitignore" file with common patterns for a typical Blueprint & C++ project
 			const FString GitIgnoreFilename = FPaths::Combine(FPaths::ProjectDir(), TEXT(".gitignore"));
-			const FString GitIgnoreContent = TEXT("Binaries\nDerivedDataCache\nIntermediate\nSaved\n.vscode\n.vs\n*.VC.db\n*.opensdf\n*.opendb\n*.sdf\n*.sln\n*.suo\n*.xcodeproj\n*.xcworkspace\n*.log");
+			const FString GitIgnoreContent = TEXT("Binaries\nDerivedDataCache\nIntermediate\nSaved\n.vscode\n.vs\n*.VC.db\n*.opensdf\n*.opendb\n*.sdf\n*.sln\n*.suo\n*.xcodeproj\n*.xcworkspace");
 			if(FFileHelper::SaveStringToFile(GitIgnoreContent, *GitIgnoreFilename, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 			{
 				ProjectFiles.Add(GitIgnoreFilename);
@@ -517,7 +502,7 @@ FReply SGitSourceControlSettings::OnClickedInitializeGitRepository()
 		}
 		if(bAutoCreateReadme)
 		{
-			// 2.b. Create a "README.md" file with a custom description
+			// 2.a. Create a "README.md" file with a custom description
 			const FString ReadmeFilename = FPaths::Combine(FPaths::ProjectDir(), TEXT("README.md"));
 			if (FFileHelper::SaveStringToFile(ReadmeContent.ToString(), *ReadmeFilename, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 			{

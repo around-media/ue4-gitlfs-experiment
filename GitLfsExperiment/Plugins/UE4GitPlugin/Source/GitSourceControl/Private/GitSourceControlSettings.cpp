@@ -3,12 +3,11 @@
 // Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
 // or copy at http://opensource.org/licenses/MIT)
 
+#include "GitSourceControlPrivatePCH.h"
 #include "GitSourceControlSettings.h"
-
 #include "Misc/ScopeLock.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Modules/ModuleManager.h"
-#include "SourceControlHelpers.h"
 #include "GitSourceControlModule.h"
 #include "GitSourceControlUtils.h"
 

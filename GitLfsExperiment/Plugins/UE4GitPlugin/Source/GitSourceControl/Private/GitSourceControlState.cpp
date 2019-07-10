@@ -3,6 +3,7 @@
 // Distributed under the MIT License (MIT) (See accompanying file LICENSE.txt
 // or copy at http://opensource.org/licenses/MIT)
 
+#include "GitSourceControlPrivatePCH.h"
 #include "GitSourceControlState.h"
 
 #define LOCTEXT_NAMESPACE "GitSourceControl.State"
@@ -69,10 +70,6 @@ FName FGitSourceControlState::GetIconName() const
 	{
 		return FName("Subversion.CheckedOutByOtherUser");
 	}
-	else if (!IsCurrent())
-	{
-		return FName("Subversion.NotAtHeadRevision");
-	}
 
 	switch(WorkingCopyState)
 	{
@@ -116,10 +113,6 @@ FName FGitSourceControlState::GetSmallIconName() const
 	else if(LockState == ELockState::LockedOther)
 	{
 		return FName("Subversion.CheckedOutByOtherUser_Small");
-	}
-	else if (!IsCurrent())
-	{
-		return FName("Subversion.NotAtHeadRevision_Small");
 	}
 
 	switch(WorkingCopyState)
@@ -165,10 +158,6 @@ FText FGitSourceControlState::GetDisplayName() const
 	{
 		return FText::Format( LOCTEXT("LockedOther", "Locked by "), FText::FromString(LockUser) );
 	}
-	else if (!IsCurrent())
-	{
-		return LOCTEXT("NotCurrent", "Not current");
-	}
 
 	switch(WorkingCopyState)
 	{
@@ -208,10 +197,6 @@ FText FGitSourceControlState::GetDisplayTooltip() const
 	else if(LockState == ELockState::LockedOther)
 	{
 		return FText::Format( LOCTEXT("LockedOther_Tooltip", "Locked for editing by: {0}"), FText::FromString(LockUser) );
-	}
-	else if (!IsCurrent())
-	{
-		return LOCTEXT("NotCurrent_Tooltip", "The file(s) are not at the head revision");
 	}
 
 	switch(WorkingCopyState)
@@ -258,15 +243,15 @@ bool FGitSourceControlState::CanCheckIn() const
 {
 	if(bUsingGitLfsLocking)
 	{
-		return ( ( (LockState == ELockState::Locked) && !IsConflicted() ) || (WorkingCopyState == EWorkingCopyState::Added) ) && IsCurrent();
+		return ( ( (LockState == ELockState::Locked) && !IsConflicted() ) || (WorkingCopyState == EWorkingCopyState::Added) );
 	}
 	else
 	{
-		return (WorkingCopyState == EWorkingCopyState::Added
+		return WorkingCopyState == EWorkingCopyState::Added
 			|| WorkingCopyState == EWorkingCopyState::Deleted
 			|| WorkingCopyState == EWorkingCopyState::Missing
 			|| WorkingCopyState == EWorkingCopyState::Modified
-			|| WorkingCopyState == EWorkingCopyState::Renamed) && IsCurrent();
+			|| WorkingCopyState == EWorkingCopyState::Renamed;
 	}
 }
 
@@ -274,8 +259,7 @@ bool FGitSourceControlState::CanCheckout() const
 {
 	if(bUsingGitLfsLocking)
 	{
-		// We don't want to allow checkout if the file is out-of-date, as modifying an out-of-date binary file will most likely result in a merge conflict
-		return (WorkingCopyState == EWorkingCopyState::Unchanged || WorkingCopyState == EWorkingCopyState::Modified) && LockState == ELockState::NotLocked && IsCurrent();
+		return (WorkingCopyState == EWorkingCopyState::Unchanged || WorkingCopyState == EWorkingCopyState::Modified) && LockState == ELockState::NotLocked;
 	}
 	else
 	{
@@ -306,7 +290,7 @@ bool FGitSourceControlState::IsCheckedOutOther(FString* Who) const
 
 bool FGitSourceControlState::IsCurrent() const
 {
-	return !bNewerVersionOnServer;
+	return true; // @todo check the state of the HEAD versus the state of tracked branch on remote
 }
 
 bool FGitSourceControlState::IsSourceControlled() const
@@ -331,12 +315,12 @@ bool FGitSourceControlState::IsIgnored() const
 
 bool FGitSourceControlState::CanEdit() const
 {
-	return IsCurrent(); // With Git all files in the working copy are always editable (as opposed to Perforce)
+	return true; // With Git all files in the working copy are always editable (as opposed to Perforce)
 }
 
 bool FGitSourceControlState::CanDelete() const
 {
-	return !IsCheckedOutOther() && IsSourceControlled() && IsCurrent();
+	return IsSourceControlled() && IsCurrent();
 }
 
 bool FGitSourceControlState::IsUnknown() const
@@ -380,7 +364,7 @@ bool FGitSourceControlState::IsConflicted() const
 
 bool FGitSourceControlState::CanRevert() const
 {
-	return CanCheckIn();
+	return IsModified();
 }
 
 #undef LOCTEXT_NAMESPACE

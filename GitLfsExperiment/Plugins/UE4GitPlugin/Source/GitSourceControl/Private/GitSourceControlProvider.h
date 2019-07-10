@@ -64,9 +64,6 @@ public:
 	virtual bool IsEnabled() const override;
 	virtual bool IsAvailable() const override;
 	virtual const FName& GetName(void) const override;
-	virtual bool QueryStateBranchConfig(const FString& ConfigSrc, const FString& ConfigDest) /* override UE4.20 */ { return false; }
-	virtual void RegisterStateBranches(const TArray<FString>& BranchNames, const FString& ContentRoot) /* override UE4.20 */ {}
-	virtual int32 GetStateBranchIndex(const FString& InBranchName) const /* override UE4.20 */ { return INDEX_NONE; }
 	virtual ECommandResult::Type GetState( const TArray<FString>& InFiles, TArray< TSharedRef<ISourceControlState, ESPMode::ThreadSafe> >& OutState, EStateCacheUsage::Type InStateCacheUsage ) override;
 	virtual TArray<FSourceControlStateRef> GetCachedStateByPredicate(TFunctionRef<bool(const FSourceControlStateRef&)> Predicate) const override;
 	virtual FDelegateHandle RegisterSourceControlStateChanged_Handle(const FSourceControlStateChanged::FDelegate& SourceControlStateChanged) override;
@@ -76,7 +73,7 @@ public:
 	virtual void CancelOperation( const TSharedRef<ISourceControlOperation, ESPMode::ThreadSafe>& InOperation ) override;
 	virtual bool UsesLocalReadOnlyState() const override;
 	virtual bool UsesChangelists() const override;
-	virtual bool UsesCheckout() const override;
+	virtual bool UsesCheckout() const /* override for UE4.17 */;
 	virtual void Tick() override;
 	virtual TArray< TSharedRef<class ISourceControlLabel> > GetLabels( const FString& InMatchingSpec ) const override;
 #if SOURCE_CONTROL_WITH_SLATE
