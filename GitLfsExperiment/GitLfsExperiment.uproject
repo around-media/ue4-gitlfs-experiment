@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "{4.19-vxgi-aroundmedia}",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "GitLfsExperiment",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "GitSourceControl",
+			"Enabled": true
+		}
+	]
+}
